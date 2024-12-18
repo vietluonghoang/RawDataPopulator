@@ -29,13 +29,44 @@
     th {
       background-color: #f2f2f2;
     }
+    #resultTable td {
+      white-space: pre-wrap;
+      vertical-align: top;
+    }
+    .parse-button {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-weight: bold;
+    }
+
+    .parse-button:disabled {
+        cursor: not-allowed;
+    }
+
+    .parse-button.empty {
+        background-color: #ff5252;
+        color: white;
+    }
+
+    .parse-button.ready {
+        background-color: #4caf50;
+        color: white;
+    }
+
+    .parse-button.parsing {
+        background-color: #ffd700;
+        color: #2e7d32;
+    }
   </style>
 </head>
 <body>
   <h2>Document Parser</h2>
   <label for="rawInput">Paste the plain text document below:</label>
   <textarea id="rawInput" placeholder="Paste your document here..."></textarea>
-  <button onclick="parseDocument()">Parse Document</button>
+  <button id="parseButton" class="parse-button empty" onclick="parseDocument()" disabled>Fill the input</button>
 
   <h3>Parsed Structure</h3>
   <table id="resultTable">
@@ -52,100 +83,177 @@
   </table>
 
   <script>
-    function parseDocument() {
-      const rawText = document.getElementById('rawInput').value;
-      const tableBody = document.querySelector('#resultTable tbody');
-      tableBody.innerHTML = ''; // Clear existing table rows
+    // Get references to the elements
+    const inputArea = document.getElementById('rawInput');
+    const parseButton = document.getElementById('parseButton');
 
-      const lines = rawText.split(/\n+/); // Split text into lines
-      const levels = [];
-      let idCounter = 0;
-      let parentStack = [];
+    // Add input listener to check content
+    inputArea.addEventListener('input', function() {
+        if (this.value.trim() === '') {
+            parseButton.disabled = true;
+            parseButton.textContent = 'Fill the input';
+            parseButton.className = 'parse-button empty';
+        } else {
+            parseButton.disabled = false;
+            parseButton.textContent = 'Parse Document';
+            parseButton.className = 'parse-button ready';
+        }
+    });
 
-      // Regex to match document levels
-      const levelPatterns = [
-        { name: 'Phần', regex: /^(Phần(?: thứ)? [\w\dà-ư]+.*)/i },
-        { name: 'Phụ lục', regex: /^(Phụ lục [\w\d]+.*)/i },
-        { name: 'Chương', regex: /^(Chương [\w\d]+.*)/i },
-        { name: 'Mục', regex: /^(Mục [\w\d]+.*)/i },
-        { name: 'Điều', regex: /^(Điều [\w\d]+.*|[\w\d]+\.[\d]+\..*|[\w]\.[\w]+.*)/ },
-        { name: 'NumberDot', regex: /^([\d]+[\w]*\.).*/ },
-        { name: 'CharDotOrParen', regex: /^([\w]\.|[\w]\)).*/ }
-      ];
+    // Add these before the parseDocument function
+    const levelPatterns = [
+        { name: 'Phần', regex: /^(Phần(?: thứ)? [^\n]+?)\s*(.*)/iu },
+        { name: 'Phụ lục', regex: /^(Phụ lục [^\n]+?)\s*(.*)/iu },
+        { name: 'Chương', regex: /^(Chương\s+(?:[IVX]+|\d+))\s*(.*)/iu },
+        { name: 'Mục', regex: /^(Mục [^\n]+?)\s*(.*)/iu },
+        { name: 'Điều', regex: /^(Điều [^\n]+?\.)\s*(.*)/iu },
+        { name: 'NumberDot', regex: /^(\d+\.)\s*(.*)/iu },
+        { name: 'CharDotOrParen', regex: /^([\p{L}]\.|[\p{L}]\))\s*(.*)/iu }
+    ];
 
-      function findLevel(line) {
+    function findLevel(line) {
         for (const level of levelPatterns) {
-          const match = line.match(level.regex);
-          if (match) {
-            return { name: level.name, fullMatch: match[1] };
-          }
+            const match = line.match(level.regex);
+            if (match) {
+                return { 
+                    name: level.name, 
+                    fullMatch: match[1].trim(),
+                    title: match[2].trim()
+                };
+            }
         }
         return null;
-      }
-
-      let currentDetail = '';
-      lines.forEach((line) => {
-        const trimmed = line.trim();
-        if (!trimmed) return; // Skip empty lines
-
-        const levelMatch = findLevel(trimmed);
-        if (levelMatch) {
-          const id = ++idCounter;
-          const title = trimmed.replace(levelMatch.fullMatch, '').trim();
-          
-          // Push previous detail if available
-          if (currentDetail) {
-            levels[levels.length - 1].detail = currentDetail.trim();
-            currentDetail = '';
-          }
-
-          // Find parent level
-          while (
-            parentStack.length > 0 &&
-            !isChildLevel(parentStack[parentStack.length - 1].name, levelMatch.name)
-          ) {
-            parentStack.pop();
-          }
-          const parentId = parentStack.length > 0 ? parentStack[parentStack.length - 1].id : null;
-          levels.push({ id, name: levelMatch.fullMatch, title, detail: '', parentId });
-
-          // Update stack
-          parentStack.push({ id, name: levelMatch.name });
-        } else {
-          // This is part of the detail
-          currentDetail += line + ' ';
-        }
-      });
-
-      // Assign remaining detail
-      if (currentDetail && levels.length > 0) {
-        levels[levels.length - 1].detail = currentDetail.trim();
-      }
-
-      // Populate the table
-      levels.forEach(level => {
-        const row = `<tr>
-          <td>${level.id}</td>
-          <td>${level.name}</td>
-          <td>${level.title}</td>
-          <td>${level.detail}</td>
-          <td>${level.parentId || ''}</td>
-        </tr>`;
-        tableBody.innerHTML += row;
-      });
     }
 
     function isChildLevel(parentName, childName) {
-      const levelHierarchy = [
-        'Phần',
-        'Phụ lục',
-        'Chương',
-        'Mục',
-        'Điều',
-        'NumberDot',
-        'CharDotOrParen'
-      ];
-      return levelHierarchy.indexOf(childName) > levelHierarchy.indexOf(parentName);
+        const levelHierarchy = [
+            'Phần',
+            'Phụ lục',
+            'Chương',
+            'Mục',
+            'Điều',
+            'NumberDot',
+            'CharDotOrParen'
+        ];
+        return levelHierarchy.indexOf(childName) > levelHierarchy.indexOf(parentName);
+    }
+
+    // Modify the parseDocument function to include button states
+    async function parseDocument() {
+        // Set parsing state
+        parseButton.disabled = true;
+        parseButton.textContent = 'Parsing...';
+        parseButton.className = 'parse-button parsing';
+
+        try {
+            // Clear the table first
+            const tableBody = document.querySelector('#resultTable tbody');
+            tableBody.innerHTML = '';
+
+            const rawText = document.getElementById('rawInput').value;
+            const lines = rawText.split(/\n/);
+            const levels = [];
+            let idCounter = 0;
+            let parentStack = [];
+            let currentDetail = '';
+            let pendingTitle = null;
+            let emptyLineCount = 0;
+
+            lines.forEach((line, index) => {
+                const trimmed = line.trim();
+                
+                if (!trimmed) {
+                    emptyLineCount++;
+                    if (currentDetail && emptyLineCount === 1) {
+                        currentDetail = currentDetail.trimEnd() + '\\n\\n';
+                    }
+                    return;
+                }
+                emptyLineCount = 0;
+
+                const levelMatch = findLevel(trimmed);
+                if (levelMatch) {
+                    const id = ++idCounter;
+                    
+                    if (currentDetail) {
+                        levels[levels.length - 1].detail = currentDetail.trimEnd();
+                        currentDetail = '';
+                    }
+
+                    while (
+                        parentStack.length > 0 &&
+                        !isChildLevel(parentStack[parentStack.length - 1].name, levelMatch.name)
+                    ) {
+                        parentStack.pop();
+                    }
+                    const parentId = parentStack.length > 0 ? parentStack[parentStack.length - 1].id : null;
+
+                    if (!levelMatch.title) {
+                        pendingTitle = levelMatch.name;
+                        levels.push({ 
+                            id, 
+                            name: levelMatch.fullMatch,
+                            title: '',
+                            detail: '',
+                            parentId 
+                        });
+                    } else {
+                        pendingTitle = null;
+                        levels.push({ 
+                            id, 
+                            name: levelMatch.fullMatch,
+                            title: levelMatch.title,
+                            detail: '',
+                            parentId 
+                        });
+                    }
+
+                    parentStack.push({ id, name: levelMatch.name });
+                } else {
+                    if (pendingTitle && levels.length > 0) {
+                        levels[levels.length - 1].title = trimmed;
+                        pendingTitle = null;
+                    } else {
+                        const lastLevel = levels[levels.length - 1];
+                        if (lastLevel && trimmed !== lastLevel.title) {
+                            if (currentDetail) {
+                                if (currentDetail.endsWith('\\n\\n')) {
+                                    currentDetail += trimmed;
+                                } else {
+                                    currentDetail = currentDetail.trimEnd() + '\\n' + trimmed;
+                                }
+                            } else {
+                                currentDetail = trimmed;
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Handle any remaining detail
+            if (currentDetail && levels.length > 0) {
+                levels[levels.length - 1].detail = currentDetail.trimEnd();
+            }
+
+            // Populate the table
+            levels.forEach(level => {
+                const row = document.createElement('tr');
+                
+                // Create and populate cells
+                [level.id, level.name, level.title, level.detail, level.parentId || ''].forEach(text => {
+                    const cell = document.createElement('td');
+                    cell.textContent = text;
+                    row.appendChild(cell);
+                });
+                
+                tableBody.appendChild(row);
+            });
+        } finally {
+            // Reset button state after parsing (whether successful or not)
+            parseButton.disabled = false;
+            parseButton.textContent = 'Parse Document';
+            parseButton.className = 'parse-button ready';
+        }
     }
   </script>
 </body>
