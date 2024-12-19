@@ -118,15 +118,15 @@
         { name: 'Chương', regex: /^(Chương\s+(?:[IVX]+|\d+))\s*(.*)/iu },
         { name: 'Mục', regex: /^(Mục [^\n]+?)\s*(.*)/iu },
         { name: 'Điều', regex: /^(Điều [^\n]+?\.)\s*(.*)/iu },
-        { name: 'Khoản', regex: /^(\d+\.(?:\d+\.)*)\s*(.*)/iu },
-        { name: 'Điểm', regex: /^([\p{L}]\.|[\p{L}]\))\s*(.*)/iu }
+        { name: 'Khoản', regex: /^(\d+\.(?:\d+\.)?)\s+(.*)/iu },
+        { name: 'Điểm', regex: /^([\p{L}]\.|[\p{L}]\)|\d+\.(?:\d+\.){2,})\s+(.*)/iu }
     ];
 
     function findLevel(line) {
         for (const level of levelPatterns) {
+            console.log('----\nSource: ' + line)
             const match = line.match(level.regex);
             if (match) {
-                console.log('----\nSource: ' + line)
                 console.log('name: ' + level.name)
                 console.log('full match: ' + match[1].trim())
                 console.log('title: ' + match[2].trim())
