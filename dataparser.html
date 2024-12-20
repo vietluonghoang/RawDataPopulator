@@ -74,6 +74,7 @@
     <thead>
       <tr>
         <th>ID</th>
+        <th>Level</th>
         <th>Name</th>
         <th>Title</th>
         <th>Detail</th>
@@ -210,7 +211,8 @@
                             name: levelMatch.fullMatch,
                             title: '',
                             detail: '',
-                            parentId 
+                            parentId,
+                            levelName: levelMatch.name
                         });
                     } else {
                         pendingTitle = null;
@@ -219,7 +221,8 @@
                             name: levelMatch.fullMatch,
                             title: levelMatch.title,
                             detail: '',
-                            parentId 
+                            parentId,
+                            levelName: levelMatch.name
                         });
                     }
 
@@ -254,9 +257,10 @@
             levels.forEach(level => {
                 const row = document.createElement('tr');
                 
-                // Create and populate cells (added empty string for the new column)
+                // Create and populate cells (added level name for the new column)
                 [
                     level.id, 
+                    level.levelName,
                     level.name, 
                     level.title, 
                     level.detail, 
@@ -302,70 +306,77 @@
 
             // Updated regex patterns in order of specificity (most specific first)
             const patterns = [
-                //Generic pattern
-                /((điểm(\s+([\p{L}]|[\p{L}]|(\d+\.){2,}(?:\d+))\b)+(((,|\s+và)(\s+điểm)*\s+([\p{L}]|[\p{L}]|(\d+\.){2,}(?:\d+))\b)+)*)*\s*khoản(\s+(\d+\.(?:\d+)?)\b)+(((,|\s+và)(\s+khoản)*\s+(\d+\.(?:\d+)?)\b)+)*)*\s*điều(\s+(\d+|này)+\b)+(((,|\s+và)(\s+điều)*\s+(\d+|này)+\b)+)*/iu,
+                //Generic pattern điểm, khoản and Điều
+                /((điểm(\s+([\p{L}]|(\d+\.){2,}(?:\d+))\b(,(\s+điểm)*|\s+và(\s+điểm)*)*)+\s*)*(khoản(\s+((\d+(?:\.\d+)?)|này)\b(;|,(\s+khoản)*|\s+và(\s+khoản)*)*)+\s*))+(điều(\s+(\d+[\p{L}]*|này)\b(,(\s+điều)*|\s+và(\s+điều)*)*)+)/iu,
                 
-                // Complex mixed references with điểm, khoản and Điều
-                /điểm [đ\p{L}] và điểm [đ\p{L}] khoản \d+(?:,\s*khoản \d+)*(?:,\s*điểm [đ\p{L}] khoản \d+)? (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
+                //Generic pattern điểm and khoản
+                /((điểm(\s+([\p{L}]|(\d+\.){2,}(?:\d+))\b(,(\s+điểm)*|\s+và(\s+điểm)*)*)+\s*)*(khoản(\s+((\d+(?:\.\d+)?)|này)\b(;|,(\s+khoản)*|\s+và(\s+khoản)*)*)+\s*))/iu,
                 
-                // Multiple điểm with commas and "và" with khoản and Điều
-                /(?:tại )?(?:các )?điểm [đ\p{L},\s]+(?:và|,) [đ\p{L}]+ khoản \d+ (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
+                // // Complex mixed references with điểm, khoản and Điều
+                // /điểm [đ\p{L}] và điểm [đ\p{L}] khoản \d+(?:,\s*khoản \d+)*(?:,\s*điểm [đ\p{L}] khoản \d+)? (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
                 
-                // Multiple điểm (comma-separated list) with khoản and Điều
-                /(?:tại )?(?:các )?điểm [đ\p{L}],\s*[đ\p{L}],\s*[đ\p{L}](?:\s*,\s*[đ\p{L}])*(?: và [đ\p{L}])? khoản \d+ (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
+                // // Multiple điểm with commas and "và" with khoản and Điều
+                // /(?:tại )?(?:các )?điểm [đ\p{L},\s]+(?:và|,) [đ\p{L}]+ khoản \d+ (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
                 
-                // Two điểm with khoản and Điều
-                /(?:tại )?điểm [đ\p{L}] và điểm [đ\p{L}] khoản \d+ (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
+                // // Multiple điểm (comma-separated list) with khoản and Điều
+                // /(?:tại )?(?:các )?điểm [đ\p{L}],\s*[đ\p{L}],\s*[đ\p{L}](?:\s*,\s*[đ\p{L}])*(?: và [đ\p{L}])? khoản \d+ (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
                 
-                // Single điểm with khoản and Điều
-                /(?:tại )?điểm [đ\p{L}] khoản \d+ (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
+                // // Two điểm with kho��n and Điều
+                // /(?:tại )?điểm [đ\p{L}] và điểm [đ\p{L}] khoản \d+ (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
                 
-                // Multiple điểm with khoản này
-                /(?:tại )?(?:các )?điểm [đ\p{L},\s]+(?:và|,) [đ\p{L}]+ khoản này/iu,
+                // // Single điểm with khoản and Điều
+                // /(?:tại )?điểm [��\p{L}] khoản \d+ (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
                 
-                // Two điểm with khoản này
-                /(?:tại )?điểm [đ\p{L}] và điểm [đ\p{L}] khoản này/iu,
+                // // Multiple điểm with khoản này
+                // /(?:tại )?(?:các )?điểm [đ\p{L},\s]+(?:và|,) [đ\p{L}]+ khoản này/iu,
                 
-                // Single điểm with khoản này
-                /(?:tại )?điểm [đ\p{L}] khoản này/iu,
+                // // Two điểm with khoản này
+                // /(?:tại )?điểm [đ\p{L}] và điểm [đ\p{L}] khoản này/iu,
                 
-                // Multiple khoản with và/comma with Điều
-                /khoản \d+(?:,\s*\d+)*(?:\s*và\s*khoản\s*\d+)? (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
+                // // Single điểm with khoản này
+                // /(?:tại )?điểm [đ\p{L}] khoản này/iu,
                 
-                // Two khoản with và and Điều
-                /khoản \d+ và khoản \d+ (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
+                // // Multiple khoản with và/comma with Điều
+                // /khoản \d+(?:,\s*\d+)*(?:\s*và\s*khoản\s*\d+)? (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
                 
-                // Single khoản with Điều
-                /khoản \d+ (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
+                // // Two khoản with và and Điều
+                // /khoản \d+ và khoản \d+ (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
                 
-                // Reference to "khoản này"
-                /(?:tại )?khoản này/iu,
+                // // Single khoản with Điều
+                // /khoản \d+ (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
                 
-                // Reference to just "Điều này"
-                /Điều này(?: của Luật này)?/iu
+                // // Reference to "khoản này"
+                // /(?:tại )?khoản này/iu,
+                
+                // // Reference to just "Điều này"
+                // /Điều này(?: của Luật này)?/iu
             ];
 
             // Process each row
             for (let row of rows) {
                 const cells = row.getElementsByTagName('td');
-                const titleText = cells[2].textContent;
-                const detailText = cells[3].textContent;
+                const titleText = cells[3].textContent;
+                const detailText = cells[4].textContent;
                 let extractedText = [];
 
                 // Function to process text with patterns
                 const processText = (text) => {
                     // Normalize spaces in the input text
+                    console.log('-----\n Original Source: \n' + text);
                     let remainingText = normalizeSpaces(text);
-
                     // Try each pattern in order
                     for (let pattern of patterns) {
+                        console.log('---\n Normalized Source: \n' + remainingText);
+                        console.log('---\n pattern: \n' + pattern);
                         const matches = remainingText.match(new RegExp(pattern, 'giu'));
                         if (matches) {
                             // Sort matches by length (longest first) to catch most specific references
                             matches.sort((a, b) => b.length - a.length);
                             matches.forEach(match => {
+                              console.log('-\n Original Match: \n' + match);
                                 // Normalize spaces in the match
                                 const normalizedMatch = normalizeSpaces(match);
+                                console.log('-\n Normalized Match: \n' + match);
                                 if (!extractedText.includes(normalizedMatch)) {
                                     extractedText.push(normalizedMatch);
                                     // Remove the matched text from remainingText to prevent duplicate matches
@@ -383,8 +394,8 @@
                 // Sort by length (longest first)
                 extractedText.sort((a, b) => b.length - a.length);
 
-                // Update the Extracted Related Text cell
-                cells[5].textContent = extractedText.join('\n');
+                // Update the Extracted Related Text cell (correct index for Extracted Related Text)
+                cells[6].textContent = extractedText.join('\n'); // Ensure this is the correct index for Extracted Related Text
             }
 
         } finally {
