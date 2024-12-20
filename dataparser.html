@@ -276,10 +276,12 @@
             extractButton.textContent = 'Extract Related Level';
             extractButton.className = 'parse-button ready';
         } finally {
-            // Reset button state after parsing (whether successful or not)
-            parseButton.disabled = false;
-            parseButton.textContent = 'Parse Document';
-            parseButton.className = 'parse-button ready';
+            // Delay before resetting button state
+            setTimeout(() => {
+                parseButton.disabled = false;
+                parseButton.textContent = 'Parse Document';
+                parseButton.className = 'parse-button ready';
+            }, 1000); // 1 second delay
         }
     }
 
@@ -302,6 +304,7 @@
             const patterns = [
                 //Generic pattern
                 /((điểm(\s+([\p{L}]|[\p{L}]|(\d+\.){2,}(?:\d+))\b)+(((,|\s+và)(\s+điểm)*\s+([\p{L}]|[\p{L}]|(\d+\.){2,}(?:\d+))\b)+)*)*\s*khoản(\s+(\d+\.(?:\d+)?)\b)+(((,|\s+và)(\s+khoản)*\s+(\d+\.(?:\d+)?)\b)+)*)*\s*điều(\s+(\d+|này)+\b)+(((,|\s+và)(\s+điều)*\s+(\d+|này)+\b)+)*/iu,
+                
                 // Complex mixed references with điểm, khoản and Điều
                 /điểm [đ\p{L}] và điểm [đ\p{L}] khoản \d+(?:,\s*khoản \d+)*(?:,\s*điểm [đ\p{L}] khoản \d+)? (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
                 
@@ -385,9 +388,12 @@
             }
 
         } finally {
-            extractButton.disabled = false;
-            extractButton.textContent = 'Extract Related Level';
-            extractButton.className = 'parse-button ready';
+            // Delay before resetting button state
+            setTimeout(() => {
+                extractButton.disabled = false;
+                extractButton.textContent = 'Extract Related Level';
+                extractButton.className = 'parse-button ready';
+            }, 1000); // 1 second delay
         }
     }
   </script>
