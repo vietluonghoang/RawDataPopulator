@@ -229,7 +229,6 @@
             let idCounter = 0;
             let parentStack = [];
             let currentDetail = '';
-            let pendingTitle = null;
             let emptyLineCount = 0;
 
             lines.forEach((line, index) => {
@@ -261,10 +260,26 @@
                     }
                     const parentId = parentStack.length > 0 ? parentStack[parentStack.length - 1].id : null;
 
+                    // Initialize title with the level title
+                    let title = levelMatch.title || '';
+
+                    // Check if the title is on the same line
+                    if (title) {
+                        // Title is already set from levelMatch
+                    } else if (index + 1 < lines.length) {
+                        // Check the next line
+                        const nextLine = lines[index + 1].trim();
+                        const nextLevelMatch = findLevel(nextLine);
+                        if (!nextLevelMatch) {
+                            // If the next line is not a new level, take it as the title
+                            title = nextLine;
+                        }
+                    }
+
                     levels.push({ 
                         id, 
                         name: levelMatch.fullMatch,
-                        title: levelMatch.title || '',
+                        title: title, // Use the determined title
                         detail: '',
                         parentId,
                         levelName: levelMatch.name
