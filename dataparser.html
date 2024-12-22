@@ -64,8 +64,45 @@
 </head>
 <body>
   <h2>Document Parser</h2>
-  <label for="rawInput">Paste the plain text document below:</label>
-  <textarea id="rawInput" placeholder="Paste your document here..."></textarea>
+  <h3>Document Information</h3>
+  <table style="width: 100%;">
+    <tr>
+      <td style="width: 15%;"><label for="documentName">Document Name:</label></td>
+      <td style="width: 30%;"><input type="text" id="documentName" placeholder="Enter document name..." /></td>
+      <td rowspan="6">
+        <textarea id="documentContent" placeholder="Paste your document here..."></textarea>
+      </td>
+    </tr>
+    <tr>
+      <td style="width: 15%;"><label for="documentCode">Document Code:</label></td>
+      <td style="width: 30%;"><input type="text" id="documentCode" placeholder="Enter document code..." /></td>
+    </tr>
+    <tr>
+      <td style="width: 15%;"><label for="documentType">Document Type:</label></td>
+      <td style="width: 30%;">
+        <select id="documentType">
+          <option value="Luật">Luật</option>
+          <option value="Nghị định">Nghị định</option>
+          <option value="Quy chuẩn">Quy chuẩn</option>
+          <option value="Thông tư">Thông tư</option>
+          <option value="Văn bản hợp nhất">Văn bản hợp nhất</option>
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <td style="width: 15%;"><label for="effectiveDate">Effective Date:</label></td>
+      <td style="width: 30%;"><input type="date" id="effectiveDate" /></td>
+    </tr>
+    <tr>
+      <td style="width: 15%;"><label for="documentToReplace">Document to Replace:</label></td>
+      <td style="width: 30%;"><input type="text" id="documentToReplace" placeholder="Enter document to replace..." /></td>
+    </tr>
+    <tr>
+      <td style="width: 15%;"><label for="documentID">Document ID:</label></td>
+      <td style="width: 30%;"><input type="number" id="documentID" value="0" readonly /></td>
+    </tr>
+  </table>
+
   <button id="parseButton" class="parse-button empty" onclick="parseDocument()" disabled>Fill the input</button>
   <button id="extractButton" class="parse-button empty" onclick="extractRelatedLevel()" disabled>Extract Related Level</button>
 
@@ -80,6 +117,7 @@
         <th>Detail</th>
         <th>Parent ID</th>
         <th>Extracted Related Text</th>
+        <th>Document ID</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -87,9 +125,20 @@
 
   <script>
     // Get references to the elements
-    const inputArea = document.getElementById('rawInput');
+    const inputArea = document.getElementById('documentContent');
     const parseButton = document.getElementById('parseButton');
     const extractButton = document.getElementById('extractButton');
+
+    // Variable to store document information
+    let documentInfo = {
+        name: '',
+        code: '',
+        type: '',
+        effectiveDate: '',
+        toReplace: '',
+        id: Date.now(), // Auto-generated Document ID
+        parsedStructure: []
+    };
 
     // Add input listener to check content
     inputArea.addEventListener('input', function() {
@@ -119,7 +168,7 @@
         { name: 'Chương', regex: /^(Chương\s+(?:[IVX]+|\d+))\s*(.*)/iu },
         { name: 'Mục', regex: /^(Mục [^\n]+?)\s*(.*)/iu },
         { name: 'Điều', regex: /^(Điều [^\n]+?\.)\s*(.*)/iu },
-        { name: 'Khoản', regex: /^(\d+\.(?:\d+\.)?)\s+(.*)/iu },
+        { name: 'Khoản', regex: /^(\d+[\p{L}]*\.(?:\d+\.)?)\s+(.*)/iu },
         { name: 'Điểm', regex: /^([\p{L}]\.|[\p{L}]\)|\d+\.(?:\d+\.){2,})\s+(.*)/iu }
     ];
 
@@ -154,7 +203,7 @@
         return levelHierarchy.indexOf(childName) > levelHierarchy.indexOf(parentName);
     }
 
-    // Modify the parseDocument function to include button states
+    // Modify the parseDocument function to include document information
     async function parseDocument() {
         // Set parsing state
         parseButton.disabled = true;
@@ -166,7 +215,15 @@
             const tableBody = document.querySelector('#resultTable tbody');
             tableBody.innerHTML = '';
 
-            const rawText = document.getElementById('rawInput').value;
+            // Retrieve document information from input fields
+            documentInfo.name = document.getElementById('documentName').value;
+            documentInfo.code = document.getElementById('documentCode').value;
+            documentInfo.type = document.getElementById('documentType').value;
+            documentInfo.effectiveDate = document.getElementById('effectiveDate').value;
+            documentInfo.toReplace = document.getElementById('documentToReplace').value;
+            documentInfo.id = document.getElementById('documentID').value; // Get the Document ID value
+
+            const rawText = document.getElementById('documentContent').value;
             const lines = rawText.split(/\n/);
             const levels = [];
             let idCounter = 0;
@@ -204,45 +261,27 @@
                     }
                     const parentId = parentStack.length > 0 ? parentStack[parentStack.length - 1].id : null;
 
-                    if (!levelMatch.title) {
-                        pendingTitle = levelMatch.name;
-                        levels.push({ 
-                            id, 
-                            name: levelMatch.fullMatch,
-                            title: '',
-                            detail: '',
-                            parentId,
-                            levelName: levelMatch.name
-                        });
-                    } else {
-                        pendingTitle = null;
-                        levels.push({ 
-                            id, 
-                            name: levelMatch.fullMatch,
-                            title: levelMatch.title,
-                            detail: '',
-                            parentId,
-                            levelName: levelMatch.name
-                        });
-                    }
+                    levels.push({ 
+                        id, 
+                        name: levelMatch.fullMatch,
+                        title: levelMatch.title || '',
+                        detail: '',
+                        parentId,
+                        levelName: levelMatch.name
+                    });
 
                     parentStack.push({ id, name: levelMatch.name });
                 } else {
-                    if (pendingTitle && levels.length > 0) {
-                        levels[levels.length - 1].title = trimmed;
-                        pendingTitle = null;
-                    } else {
-                        const lastLevel = levels[levels.length - 1];
-                        if (lastLevel && trimmed !== lastLevel.title) {
-                            if (currentDetail) {
-                                if (currentDetail.endsWith('\\n\\n')) {
-                                    currentDetail += trimmed;
-                                } else {
-                                    currentDetail = currentDetail.trimEnd() + '\\n' + trimmed;
-                                }
+                    const lastLevel = levels[levels.length - 1];
+                    if (lastLevel && trimmed !== lastLevel.title) {
+                        if (currentDetail) {
+                            if (currentDetail.endsWith('\\n\\n')) {
+                                currentDetail += trimmed;
                             } else {
-                                currentDetail = trimmed;
+                                currentDetail = currentDetail.trimEnd() + '\\n' + trimmed;
                             }
+                        } else {
+                            currentDetail = trimmed;
                         }
                     }
                 }
@@ -253,11 +292,14 @@
                 levels[levels.length - 1].detail = currentDetail.trimEnd();
             }
 
+            // Store parsed structure in documentInfo
+            documentInfo.parsedStructure = levels;
+
             // Populate the table
             levels.forEach(level => {
                 const row = document.createElement('tr');
                 
-                // Create and populate cells (added level name for the new column)
+                // Create and populate cells
                 [
                     level.id, 
                     level.levelName,
@@ -265,7 +307,8 @@
                     level.title, 
                     level.detail, 
                     level.parentId || '',
-                    ''  // Empty cell for Extracted Related Text
+                    '' , // Empty cell for Extracted Related Text
+                    documentInfo.id // Use the auto-generated Document ID for the new column
                 ].forEach(text => {
                     const cell = document.createElement('td');
                     cell.textContent = text;
@@ -304,13 +347,26 @@
                 return text.replace(/\s+/g, ' ');
             };
 
+            // Function to escape special characters for regex
+            const escapeRegExp = (string) => {
+                return string.replace(/([.*+?^${}()|\[\]\\])/g, '\\$1');
+            };
+
             // Updated regex patterns in order of specificity (most specific first)
             const patterns = [
+                //Generic pattern for Luật range
+                /(?<=(\s|^|[^\p{L}]))(điều|khoản|điểm)(?=\s|$|[^\p{L}])\s+([\p{L}]{1,3}|(\d+\.){2,}(?:\d+)|(\d+(?:\.\d+)?)|\d+[\p{L}]{0,3}|này)(?=\s|[^\p{L}]).*?(Luật|Nghị định)+\s*(này|Xử lý vi phạm hành chính|Giao thông đường bộ)(?=\s|$|[^\p{L}])/iu,
+
+                //Generic pattern for Điều range
+                /(?<=(\s|^|[^\p{L}]))(điều|khoản|điểm)(?=\s|[^\p{L}])\s+([\p{L}]|(\d+\.){2,}(?:\d+)|(\d+(?:\.\d+)?)|\d+[\p{L}]*|này)(?=\s|[^\p{L}]).*?(\s+điều(?:\s+(\d+[\p{L}]*|này)(?:,*\s*(và\s*)*(điều)*|(\s*\((.+?\)))*)*)+)(?=\s|$|[^\p{L}])/iu,
+
+                //Generic pattern for Khoản range
+                /(?<=(^|[^\p{L}]))(khoản|điểm)(?=\s|[^\p{L}])\s([\p{L}]|(\d+\.){2,}(?:\d+)|(\d+(?:\.\d+)?)|\d+[\p{L}]*|này)(?=\s|[^\p{L}]).*(\s+khoản(\s+((\d+(?:\.\d+)?)|này)(;|,*\s+((và\s+)*khoản)*)*)+)(?=\s|$|[^\p{L}])/iu 
                 //Generic pattern điểm, khoản and Điều
-                /((điểm(\s+([\p{L}]|(\d+\.){2,}(?:\d+))\b(,(\s+điểm)*|\s+và(\s+điểm)*)*)+\s*)*(khoản(\s+((\d+(?:\.\d+)?)|này)\b(;|,(\s+khoản)*|\s+và(\s+khoản)*)*)+\s*))+(điều(\s+(\d+[\p{L}]*|này)\b(,(\s+điều)*|\s+và(\s+điều)*)*)+)/iu,
+                // /(((điểm(\s+([\p{L}]|(\d+\.){2,}(?:\d+))(,(\s+điểm)*|\s+và(\s+điểm)*)*)+\s*)*(khoản(\s+((\d+(?:\.\d+)?)|này)(;|,(\s+khoản)*|\s+và(\s+khoản)*)*)+\s*))*(điều(\s+(\d+[\p{L}]*|này)(,(\s+điều)*|\s+và(\s+điều)*|\s*(\(.*?(?=\))\))*)*)+))*\s*(của)*\s*(Luật|Nghị định)+\s*(này|Xử lý vi phạm hành chính|Giao thông đường bộ)+/iu,
                 
                 //Generic pattern điểm and khoản
-                /((điểm(\s+([\p{L}]|(\d+\.){2,}(?:\d+))\b(,(\s+điểm)*|\s+và(\s+điểm)*)*)+\s*)*(khoản(\s+((\d+(?:\.\d+)?)|này)\b(;|,(\s+khoản)*|\s+và(\s+khoản)*)*)+\s*))/iu,
+                // /((điểm(\s+([\p{L}]|(\d+\.){2,}(?:\d+))\b(,(\s+điểm)*|\s+và(\s+điểm)*)*)+\s*)*(khoản(\s+((\d+(?:\.\d+)?)|này)\b(;|,(\s+khoản)*|\s+và(\s+khoản)*)*)+\s*))/iu,
                 
                 // // Complex mixed references with điểm, khoản and Điều
                 // /điểm [đ\p{L}] và điểm [đ\p{L}] khoản \d+(?:,\s*khoản \d+)*(?:,\s*điểm [đ\p{L}] khoản \d+)? (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
@@ -321,11 +377,11 @@
                 // // Multiple điểm (comma-separated list) with khoản and Điều
                 // /(?:tại )?(?:các )?điểm [đ\p{L}],\s*[đ\p{L}],\s*[đ\p{L}](?:\s*,\s*[đ\p{L}])*(?: và [đ\p{L}])? khoản \d+ (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
                 
-                // // Two điểm with kho��n and Điều
+                // // Two điểm with khoản and Điều
                 // /(?:tại )?điểm [đ\p{L}] và điểm [đ\p{L}] khoản \d+ (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
                 
                 // // Single điểm with khoản and Điều
-                // /(?:tại )?điểm [��\p{L}] khoản \d+ (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
+                // /(?:tại )?điểm [đ\p{L}] khoản \d+ (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
                 
                 // // Multiple điểm with khoản này
                 // /(?:tại )?(?:các )?điểm [đ\p{L},\s]+(?:và|,) [đ\p{L}]+ khoản này/iu,
@@ -360,7 +416,7 @@
                 let extractedText = [];
 
                 // Function to process text with patterns
-                const processText = (text) => {
+                const processText = (text, cell) => {
                     // Normalize spaces in the input text
                     console.log('-----\n Original Source: \n' + text);
                     let remainingText = normalizeSpaces(text);
@@ -373,7 +429,7 @@
                             // Sort matches by length (longest first) to catch most specific references
                             matches.sort((a, b) => b.length - a.length);
                             matches.forEach(match => {
-                              console.log('-\n Original Match: \n' + match);
+                                console.log('-\n Original Match: \n' + match);
                                 // Normalize spaces in the match
                                 const normalizedMatch = normalizeSpaces(match);
                                 console.log('-\n Normalized Match: \n' + match);
@@ -381,6 +437,9 @@
                                     extractedText.push(normalizedMatch);
                                     // Remove the matched text from remainingText to prevent duplicate matches
                                     remainingText = remainingText.replace(match, ' '.repeat(match.length));
+                                    // Highlight the match in the cell with a stronger color
+                                    const highlightedMatch = `<span style="background-color: orange; color: white;">${match}</span>`;
+                                    cell.innerHTML = cell.innerHTML.replace(new RegExp(escapeRegExp(normalizedMatch), 'g'), highlightedMatch);
                                 }
                             });
                         }
@@ -388,8 +447,8 @@
                 };
 
                 // Process both title and detail
-                processText(titleText);
-                processText(detailText);
+                processText(titleText, cells[3]); // Pass the Title cell
+                processText(detailText, cells[4]); // Pass the Detail cell
 
                 // Sort by length (longest first)
                 extractedText.sort((a, b) => b.length - a.length);
