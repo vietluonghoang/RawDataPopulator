@@ -209,7 +209,7 @@
                     <option value="Nghị định">Nghị định</option>
                     <option value="Quy chuẩn">Quy chuẩn</option>
                     <option value="Thông tư">Thông tư</option>
-                    <option value="Văn bản hợp nhất">Văn bản hợp nhất</option>
+                    <option value="Văn bản hợp nh��t">Văn bản hợp nhất</option>
                 </select>
             </td>
         </tr>
@@ -268,8 +268,8 @@
             const docTable = document.createElement('table');
             docTable.innerHTML = `
                 <tr>
-                    <td style="width: 15%;"><strong>Document Name:</strong></td>
-                    <td style="width: 30%;">${doc.name}</td>
+                    <td style="width: 10%;"><strong>Document Name:</strong></td>
+                    <td style="width: 20%;">${doc.name}</td>
                     <td rowspan="6"><strong>Document Content:</strong><br /><textarea readonly style="width: 100%; height: 200px;">${doc.content}</textarea></td>
                 </tr>
                 <tr>
@@ -298,7 +298,6 @@
                         <button class="delete-button" onclick="deleteDocument(${index})">Delete</button>
                     </td>
                 </tr>
-                <tr><td colspan="5"><hr></td></tr>
             `;
             container.appendChild(docTable);
         });
@@ -307,8 +306,18 @@
         const toggleButton = document.getElementById('toggleDocumentInfoButton');
         if (documentInfo.length === 0) {
             toggleButton.style.display = 'none'; // Hide button if no documents
+            toggleButton.disabled = true; // Disable button if no documents
         } else {
             toggleButton.style.display = 'inline-block'; // Show button if there are documents
+            toggleButton.disabled = false; // Enable button if there is at least one document
+            
+            // Check if tables exist before accessing
+            const tables = container.getElementsByTagName('table');
+            if (tables.length > 0) {
+                toggleButton.textContent = tables[0].style.display === 'none' ? '▲' : '▼';
+            } else {
+                toggleButton.textContent = '▼'; // Default to down arrow if no tables
+            }
         }
     }
 
@@ -585,7 +594,7 @@
             // Updated regex patterns in order of specificity (most specific first)
             const patterns = [
                 //Generic pattern for Luật range
-                /(?<=(\s|^|[^\p{L}]))(điều|khoản|điểm)(?=\s|$|[^\p{L}])\s+([\p{L}]{1,3}|(\d+\.){2,}(?:\d+)|(\d+(?:\.\d+)?)|\d+[\p{L}]{0,3}|này)(?=\s|[^\p{L}]).*?(Luật|Nghị định)+\s*(này|Xử lý vi phạm hành chính|Giao thông đường bộ)(?=\s|$|[^\p{L}])/iu,
+                /(?<=(\s|^|[^\p{L}]))(điều|khoản|điểm)(?=\s|$|[^\p{L}])\s+([\p{L}]{1,3}|(\d+\.){2,}(?:\d+)|(\d+(?:\.\d+)?)|\d+[\p{L}]{0,3}|này)(?=\s|[^\p{L}]).*?(Luật|Nghị định|Thông tư)+\s*(này|Xử lý vi phạm hành chính|Giao thông đường bộ|Trật tự, an toàn giao thông đường bộ)(?=\s|$|[^\p{L}])/iu,
 
                 //Generic pattern for Điều range
                 /(?<=(\s|^|[^\p{L}]))(điều|khoản|điểm)(?=\s|[^\p{L}])\s+([\p{L}]|(\d+\.){2,}(?:\d+)|(\d+(?:\.\d+)?)|\d+[\p{L}]*|này)(?=\s|[^\p{L}]).*?(\s+điều(?:\s+(\d+[\p{L}]*|này)(?:,*\s*(và\s*)*(điều)*|(\s*\((.+?\)))*)*)+)(?=\s|$|[^\p{L}])/iu,
@@ -628,7 +637,7 @@
                 // // Two khoản with và and Điều
                 // /khoản \d+ và khoản \d+ (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
                 
-                // // Single khoản with Điều
+                // // Single kho��n with Điều
                 // /khoản \d+ (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
                 
                 // // Reference to "khoản này"
@@ -701,20 +710,23 @@
     function toggleDocumentInfo() {
         const container = document.getElementById('documentInfoContainer');
         const tables = container.getElementsByTagName('table');
+        const toggleButton = document.getElementById('toggleDocumentInfoButton');
+
+        // Check if the document info is currently visible
         const isVisible = tables.length > 0 && tables[0].style.display !== 'none';
 
+        // Toggle the display of the document info
         for (let table of tables) {
             table.style.display = isVisible ? 'none' : 'table'; // Toggle display
         }
 
         // Update button text and class based on visibility
-        const toggleButton = document.getElementById('toggleDocumentInfoButton');
         if (isVisible) {
             toggleButton.textContent = '▼'; // Down arrow for collapsed state
-            toggleButton.className = 'parse-button empty'; // Light green for collapsed
+            toggleButton.className = 'parse-button small-button'; // Light green for collapsed
         } else {
             toggleButton.textContent = '▲'; // Up arrow for expanded state
-            toggleButton.className = 'parse-button ready'; // Light yellow for expanded
+            toggleButton.className = 'parse-button small-button'; // Light yellow for expanded
         }
     }
 
