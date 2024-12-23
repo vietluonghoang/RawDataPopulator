@@ -40,10 +40,12 @@
         cursor: pointer;
         transition: all 0.3s ease;
         font-weight: bold;
+        display: inline-block;
     }
 
     .parse-button:disabled {
         cursor: not-allowed;
+        background-color: #ffcccc;
     }
 
     .parse-button.empty {
@@ -60,6 +62,22 @@
         background-color: #ffd700;
         color: #2e7d32;
     }
+
+    .edit-button {
+        background-color: #ffd700;
+        color: black;
+    }
+
+    .delete-button {
+        background-color: #ffcccc;
+        color: black;
+    }
+
+    .save-button {
+        background-color: #4caf50;
+        color: white;
+    }
+
     .popup {
       display: none;
       position: fixed;
@@ -94,19 +112,26 @@
     textarea[readonly] {
       background-color: #f9f9f9;
     }
+
+    .small-button {
+        padding: 5px 10px;
+        font-weight: normal;
+    }
   </style>
 </head>
 <body>
   <h2>Document Parser</h2>
   <h3>Document Information</h3>
-  <div id="documentInfoContainer"></div>
-  
   <button id="newDocumentButton" class="parse-button ready" onclick="openNewDocumentPopup()">Create New Document</button>
+  <br>
+  <button id="toggleDocumentInfoButton" class="parse-button small-button" onclick="toggleDocumentInfo()" disabled>▼</button>
+  
+  <div id="documentInfoContainer"></div>
 
+  <h3>Parsed Structure</h3>
   <button id="parseButton" class="parse-button empty" disabled onclick="parseDocument()">Parse Document</button>
   <button id="extractButton" class="parse-button empty" disabled onclick="extractRelatedLevel()">Extract Related Level</button>
 
-  <h3>Parsed Structure</h3>
   <table id="resultTable">
     <thead>
       <tr>
@@ -164,6 +189,46 @@
     <button onclick="createNewDocument()">Create</button>
   </div>
 
+  <div class="popup" id="editDocumentPopup">
+    <h3>Edit Document</h3>
+    <table>
+        <tr>
+            <td><label for="editDocumentName">Document Name:</label></td>
+            <td><input type="text" id="editDocumentName" placeholder="Enter document name..." /></td>
+            <td rowspan="7"><label for="editDocumentContent">Document Content:</label><br /><textarea id="editDocumentContent" placeholder="Enter document content here..." style="width: 100%; height: 200px;"></textarea></td>
+        </tr>
+        <tr>
+            <td><label for="editDocumentCode">Document Code:</label></td>
+            <td><input type="text" id="editDocumentCode" placeholder="Enter document code..." /></td>
+        </tr>
+        <tr>
+            <td><label for="editDocumentType">Document Type:</label></td>
+            <td>
+                <select id="editDocumentType">
+                    <option value="Luật">Luật</option>
+                    <option value="Nghị định">Nghị định</option>
+                    <option value="Quy chuẩn">Quy chuẩn</option>
+                    <option value="Thông tư">Thông tư</option>
+                    <option value="Văn bản hợp nhất">Văn bản hợp nhất</option>
+                </select>
+            </td>
+        </tr>
+        <tr>
+            <td><label for="editEffectiveDate">Effective Date:</label></td>
+            <td><input type="date" id="editEffectiveDate" /></td>
+        </tr>
+        <tr>
+            <td><label for="editDocumentToReplace">Document to Replace:</label></td>
+            <td><input type="text" id="editDocumentToReplace" placeholder="Enter document to replace..." /></td>
+        </tr>
+        <tr>
+            <td><label for="editDocumentID">Document ID:</label></td>
+            <td><input type="number" id="editDocumentID" readonly /></td>
+        </tr>
+    </table>
+    <button class="save-button" onclick="saveEditedDocument()">Save</button>
+  </div>
+
   <script>
     // Get references to the elements
     const inputArea = document.getElementById('documentContent');
@@ -199,7 +264,7 @@
     function updateDocumentInfoDisplay() {
         const container = document.getElementById('documentInfoContainer');
         container.innerHTML = ''; // Clear existing content
-        documentInfo.forEach(doc => {
+        documentInfo.forEach((doc, index) => {
             const docTable = document.createElement('table');
             docTable.innerHTML = `
                 <tr>
@@ -227,10 +292,24 @@
                     <td><strong>Document ID:</strong></td>
                     <td>${doc.id}</td>
                 </tr>
-                <tr><td colspan="3"><hr></td></tr>
+                <tr>
+                    <td colspan="5">
+                        <button class="edit-button" onclick="openEditDocumentPopup(${index})">Edit</button>
+                        <button class="delete-button" onclick="deleteDocument(${index})">Delete</button>
+                    </td>
+                </tr>
+                <tr><td colspan="5"><hr></td></tr>
             `;
             container.appendChild(docTable);
         });
+
+        // Show or hide the Toggle Document Info button based on document count
+        const toggleButton = document.getElementById('toggleDocumentInfoButton');
+        if (documentInfo.length === 0) {
+            toggleButton.style.display = 'none'; // Hide button if no documents
+        } else {
+            toggleButton.style.display = 'inline-block'; // Show button if there are documents
+        }
     }
 
     // Function to open the new document popup
@@ -520,7 +599,7 @@
                 // /((điểm(\s+([\p{L}]|(\d+\.){2,}(?:\d+))\b(,(\s+điểm)*|\s+và(\s+điểm)*)*)+\s*)*(khoản(\s+((\d+(?:\.\d+)?)|này)\b(;|,(\s+khoản)*|\s+và(\s+khoản)*)*)+\s*))/iu,
                 
                 // // Complex mixed references with điểm, khoản and Điều
-                // /điểm [đ\p{L}] và điểm [đ\p{L}] khoản \d+(?:,\s*khoản \d+)*(?:,\s*đi���m [đ\p{L}] khoản \d+)? (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
+                // /điểm [đ\p{L}] và điểm [đ\p{L}] khoản \d+(?:,\s*khoản \d+)*(?:,\s*điểm [đ\p{L}] khoản \d+)? (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
                 
                 // // Multiple điểm with commas and "và" with khoản and Điều
                 // /(?:tại )?(?:các )?điểm [đ\p{L},\s]+(?:và|,) [đ\p{L}]+ khoản \d+ (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
@@ -616,6 +695,70 @@
                 extractButton.className = 'parse-button ready';
             }, 1000); // 1 second delay
         }
+    }
+
+    // Function to toggle the visibility of document information tables
+    function toggleDocumentInfo() {
+        const container = document.getElementById('documentInfoContainer');
+        const tables = container.getElementsByTagName('table');
+        const isVisible = tables.length > 0 && tables[0].style.display !== 'none';
+
+        for (let table of tables) {
+            table.style.display = isVisible ? 'none' : 'table'; // Toggle display
+        }
+
+        // Update button text and class based on visibility
+        const toggleButton = document.getElementById('toggleDocumentInfoButton');
+        if (isVisible) {
+            toggleButton.textContent = '▼'; // Down arrow for collapsed state
+            toggleButton.className = 'parse-button empty'; // Light green for collapsed
+        } else {
+            toggleButton.textContent = '▲'; // Up arrow for expanded state
+            toggleButton.className = 'parse-button ready'; // Light yellow for expanded
+        }
+    }
+
+    // Function to open the edit document popup
+    function openEditDocumentPopup(index) {
+        const doc = documentInfo[index];
+        document.getElementById('editDocumentName').value = doc.name;
+        document.getElementById('editDocumentCode').value = doc.code;
+        document.getElementById('editDocumentType').value = doc.type;
+        document.getElementById('editEffectiveDate').value = doc.effectiveDate;
+        document.getElementById('editDocumentToReplace').value = doc.toReplace;
+        document.getElementById('editDocumentID').value = doc.id;
+        document.getElementById('editDocumentContent').value = doc.content; // Fill with existing content
+        document.getElementById('editDocumentPopup').style.display = 'block';
+    }
+
+    // Function to save the edited document
+    function saveEditedDocument() {
+        const id = document.getElementById('editDocumentID').value;
+        const index = documentInfo.findIndex(doc => doc.id == id);
+        if (index !== -1) {
+            documentInfo[index] = {
+                ...documentInfo[index],
+                name: document.getElementById('editDocumentName').value,
+                code: document.getElementById('editDocumentCode').value,
+                type: document.getElementById('editDocumentType').value,
+                effectiveDate: document.getElementById('editEffectiveDate').value,
+                toReplace: document.getElementById('editDocumentToReplace').value,
+                content: document.getElementById('editDocumentContent').value
+            };
+            closeEditDocumentPopup();
+            updateDocumentInfoDisplay(); // Refresh the display
+        }
+    }
+
+    // Function to delete a document
+    function deleteDocument(index) {
+        documentInfo.splice(index, 1); // Remove the document from the array
+        updateDocumentInfoDisplay(); // Refresh the display
+    }
+
+    // Function to close the edit document popup
+    function closeEditDocumentPopup() {
+        document.getElementById('editDocumentPopup').style.display = 'none';
     }
 
     // Call createNewDocument() to initialize the first document
