@@ -60,51 +60,54 @@
         background-color: #ffd700;
         color: #2e7d32;
     }
+    .popup {
+      display: none;
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      background-color: white;
+      border: 1px solid #ccc;
+      padding: 20px;
+      z-index: 1000;
+      width: 75%;
+    }
+    .popup table {
+      width: 100%;
+    }
+    .popup td:first-child {
+      width: 15%;
+    }
+    .popup td:nth-child(2) {
+      width: 30%;
+    }
+    .overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 999;
+    }
+    textarea[readonly] {
+      background-color: #f9f9f9;
+    }
   </style>
 </head>
 <body>
   <h2>Document Parser</h2>
   <h3>Document Information</h3>
-  <table style="width: 100%;">
-    <tr>
-      <td style="width: 15%;"><label for="documentName">Document Name:</label></td>
-      <td style="width: 30%;"><input type="text" id="documentName" placeholder="Enter document name..." /></td>
-      <td rowspan="6">
-        <textarea id="documentContent" placeholder="Paste your document here..."></textarea>
-      </td>
-    </tr>
-    <tr>
-      <td style="width: 15%;"><label for="documentCode">Document Code:</label></td>
-      <td style="width: 30%;"><input type="text" id="documentCode" placeholder="Enter document code..." /></td>
-    </tr>
-    <tr>
-      <td style="width: 15%;"><label for="documentType">Document Type:</label></td>
-      <td style="width: 30%;">
-        <select id="documentType">
-          <option value="Luật">Luật</option>
-          <option value="Nghị định">Nghị định</option>
-          <option value="Quy chuẩn">Quy chuẩn</option>
-          <option value="Thông tư">Thông tư</option>
-          <option value="Văn bản hợp nhất">Văn bản hợp nhất</option>
-        </select>
-      </td>
-    </tr>
-    <tr>
-      <td style="width: 15%;"><label for="effectiveDate">Effective Date:</label></td>
-      <td style="width: 30%;"><input type="date" id="effectiveDate" /></td>
-    </tr>
-    <tr>
-      <td style="width: 15%;"><label for="documentToReplace">Document to Replace:</label></td>
-      <td style="width: 30%;"><input type="text" id="documentToReplace" placeholder="Enter document to replace..." /></td>
-    </tr>
-    <tr>
-      <td style="width: 15%;"><label for="documentID">Document ID:</label></td>
-      <td style="width: 30%;"><input type="number" id="documentID" value="0" readonly /></td>
-    </tr>
-  </table>
+  <div id="documentInfoContainer"></div>
+  
+  <button id="newDocumentButton" class="parse-button ready" onclick="openNewDocumentPopup()">Create New Document</button>
 
-  <button id="parseButton" class="parse-button empty" onclick="parseDocument()" disabled>Fill the input</button>
-  <button id="extractButton" class="parse-button empty" onclick="extractRelatedLevel()" disabled>Extract Related Level</button>
+  <h3>Document Content</h3>
+  <textarea id="documentContent" placeholder="Enter document content here..."></textarea>
+
+  <button id="parseButton" class="parse-button empty" disabled onclick="parseDocument()">Parse Document</button>
+  <button id="extractButton" class="parse-button empty" disabled onclick="extractRelatedLevel()">Extract Related Level</button>
 
   <h3>Parsed Structure</h3>
   <table id="resultTable">
@@ -123,6 +126,47 @@
     <tbody></tbody>
   </table>
 
+  <div class="overlay" id="overlay" onclick="closeNewDocumentPopup()"></div>
+  <div class="popup" id="newDocumentPopup">
+    <h3>Create New Document</h3>
+    <table>
+      <tr>
+        <td><label for="newDocumentName">Document Name:</label></td>
+        <td><input type="text" id="newDocumentName" placeholder="Enter document name..." /></td>
+        <td rowspan="7"><label for="newDocumentContent">Document Content:</label><br /><textarea id="newDocumentContent" placeholder="Enter document content here..." style="width: 100%; height: 200px;"></textarea></td>
+      </tr>
+      <tr>
+        <td><label for="newDocumentCode">Document Code:</label></td>
+        <td><input type="text" id="newDocumentCode" placeholder="Enter document code..." /></td>
+      </tr>
+      <tr>
+        <td><label for="newDocumentType">Document Type:</label></td>
+        <td>
+          <select id="newDocumentType">
+            <option value="Luật">Luật</option>
+            <option value="Nghị định">Nghị định</option>
+            <option value="Quy chuẩn">Quy chuẩn</option>
+            <option value="Thông tư">Thông tư</option>
+            <option value="Văn bản hợp nhất">Văn bản hợp nhất</option>
+          </select>
+        </td>
+      </tr>
+      <tr>
+        <td><label for="newEffectiveDate">Effective Date:</label></td>
+        <td><input type="date" id="newEffectiveDate" /></td>
+      </tr>
+      <tr>
+        <td><label for="newDocumentToReplace">Document to Replace:</label></td>
+        <td><input type="text" id="newDocumentToReplace" placeholder="Enter document to replace..." /></td>
+      </tr>
+      <tr>
+        <td><label for="newDocumentID">Document ID:</label></td>
+        <td><input type="number" id="newDocumentID" value="1" readonly /></td>
+      </tr>
+    </table>
+    <button onclick="createNewDocument()">Create</button>
+  </div>
+
   <script>
     // Get references to the elements
     const inputArea = document.getElementById('documentContent');
@@ -130,15 +174,111 @@
     const extractButton = document.getElementById('extractButton');
 
     // Variable to store document information
-    let documentInfo = {
-        name: '',
-        code: '',
-        type: '',
-        effectiveDate: '',
-        toReplace: '',
-        id: Date.now(), // Auto-generated Document ID
-        parsedStructure: []
-    };
+    let documentInfo = [];
+    let currentDocumentID = 1;
+
+    // Add a new function to create a new document entry
+    function createNewDocument() {
+        const newDocument = {
+            name: document.getElementById('newDocumentName').value,
+            code: document.getElementById('newDocumentCode').value,
+            type: document.getElementById('newDocumentType').value,
+            effectiveDate: document.getElementById('newEffectiveDate').value,
+            toReplace: document.getElementById('newDocumentToReplace').value,
+            content: document.getElementById('newDocumentContent').value,
+            id: currentDocumentID++,
+            parsedStructure: []
+        };
+        documentInfo.push(newDocument);
+        updateDocumentInfoDisplay(); // Update the display of documents
+        closeNewDocumentPopup(); // Close the popup
+    }
+
+    // Function to update the display of all documents
+    function updateDocumentInfoDisplay() {
+        const container = document.getElementById('documentInfoContainer');
+        container.innerHTML = ''; // Clear existing content
+        documentInfo.forEach(doc => {
+            const docTable = document.createElement('table');
+            docTable.innerHTML = `
+                <tr>
+                    <td style="width: 15%;"><strong>Document Name:</strong></td>
+                    <td style="width: 30%;">${doc.name}</td>
+                    <td rowspan="6"><strong>Document Content:</strong><br /><textarea readonly style="width: 100%; height: 200px;">${doc.content}</textarea></td>
+                </tr>
+                <tr>
+                    <td><strong>Document Code:</strong></td>
+                    <td>${doc.code}</td>
+                </tr>
+                <tr>
+                    <td><strong>Document Type:</strong></td>
+                    <td>${doc.type}</td>
+                </tr>
+                <tr>
+                    <td><strong>Effective Date:</strong></td>
+                    <td>${doc.effectiveDate}</td>
+                </tr>
+                <tr>
+                    <td><strong>Document to Replace:</strong></td>
+                    <td>${doc.toReplace}</td>
+                </tr>
+                <tr>
+                    <td><strong>Document ID:</strong></td>
+                    <td>${doc.id}</td>
+                </tr>
+                <tr><td colspan="3"><hr></td></tr>
+            `;
+            container.appendChild(docTable);
+        });
+    }
+
+    // Function to open the new document popup
+    function openNewDocumentPopup() {
+        document.getElementById('overlay').style.display = 'block';
+        document.getElementById('newDocumentPopup').style.display = 'block';
+        document.getElementById('newDocumentID').value = currentDocumentID;
+
+        // Reset all fields
+        document.getElementById('newDocumentName').value = '';
+        document.getElementById('newDocumentCode').value = '';
+        document.getElementById('newDocumentType').value = 'Luật'; // Reset to default
+        document.getElementById('newEffectiveDate').value = '';
+        document.getElementById('newDocumentToReplace').value = '';
+        updateCreateButtonState(); // Update button state
+    }
+
+    // Add this function to manage the Create button state
+    function updateCreateButtonState() {
+        const createButton = document.querySelector('#newDocumentPopup button');
+        const name = document.getElementById('newDocumentName').value.trim();
+        const code = document.getElementById('newDocumentCode').value.trim();
+        const type = document.getElementById('newDocumentType').value;
+        const effectiveDate = document.getElementById('newEffectiveDate').value.trim();
+        const toReplace = document.getElementById('newDocumentToReplace').value.trim();
+
+        if (name && code && type && effectiveDate && toReplace) {
+            createButton.disabled = false;
+            createButton.textContent = 'Create';
+            createButton.className = 'parse-button ready';
+        } else {
+            createButton.disabled = true;
+            createButton.textContent = 'Fill all fields';
+            createButton.className = 'parse-button empty';
+        }
+    }
+
+    // Add input listeners to check fields
+    document.getElementById('newDocumentName').addEventListener('input', updateCreateButtonState);
+    document.getElementById('newDocumentCode').addEventListener('input', updateCreateButtonState);
+    document.getElementById('newDocumentType').addEventListener('change', updateCreateButtonState);
+    document.getElementById('newEffectiveDate').addEventListener('input', updateCreateButtonState);
+    document.getElementById('newDocumentToReplace').addEventListener('input', updateCreateButtonState);
+
+    // Function to close the new document popup
+    function closeNewDocumentPopup() {
+        document.getElementById('overlay').style.display = 'none';
+        document.getElementById('newDocumentPopup').style.display = 'none';
+    }
 
     // Add input listener to check content
     inputArea.addEventListener('input', function() {
@@ -205,6 +345,17 @@
 
     // Modify the parseDocument function to include document information
     async function parseDocument() {
+        const selectedIndex = document.getElementById('documentSelect').value;
+        const currentDocument = documentInfo[selectedIndex];
+
+        // Retrieve document information from input fields
+        currentDocument.name = document.getElementById('documentName').value;
+        currentDocument.code = document.getElementById('documentCode').value;
+        currentDocument.type = document.getElementById('documentType').value;
+        currentDocument.effectiveDate = document.getElementById('effectiveDate').value;
+        currentDocument.toReplace = document.getElementById('documentToReplace').value;
+        currentDocument.id = document.getElementById('documentID').value; // Get the Document ID value
+
         // Set parsing state
         parseButton.disabled = true;
         parseButton.textContent = 'Parsing...';
@@ -214,14 +365,6 @@
             // Clear the table first
             const tableBody = document.querySelector('#resultTable tbody');
             tableBody.innerHTML = '';
-
-            // Retrieve document information from input fields
-            documentInfo.name = document.getElementById('documentName').value;
-            documentInfo.code = document.getElementById('documentCode').value;
-            documentInfo.type = document.getElementById('documentType').value;
-            documentInfo.effectiveDate = document.getElementById('effectiveDate').value;
-            documentInfo.toReplace = document.getElementById('documentToReplace').value;
-            documentInfo.id = document.getElementById('documentID').value; // Get the Document ID value
 
             const rawText = document.getElementById('documentContent').value;
             const lines = rawText.split(/\n/);
@@ -308,7 +451,7 @@
             }
 
             // Store parsed structure in documentInfo
-            documentInfo.parsedStructure = levels;
+            currentDocument.parsedStructure = levels;
 
             // Populate the table
             levels.forEach(level => {
@@ -323,7 +466,7 @@
                     level.detail, 
                     level.parentId || '',
                     '' , // Empty cell for Extracted Related Text
-                    documentInfo.id // Use the auto-generated Document ID for the new column
+                    currentDocument.id // Use the auto-generated Document ID for the new column
                 ].forEach(text => {
                     const cell = document.createElement('td');
                     cell.textContent = text;
@@ -396,7 +539,7 @@
                 // /(?:tại )?điểm [đ\p{L}] và điểm [đ\p{L}] khoản \d+ (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
                 
                 // // Single điểm with khoản and Điều
-                // /(?:tại )?điểm [đ\p{L}] khoản \d+ (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
+                // /(?:tại )?điểm [đ\p{L}] khoản \d+ (?:iều \d+|Điều này)(?: của Luật này)?/iu,
                 
                 // // Multiple điểm with khoản này
                 // /(?:tại )?(?:các )?điểm [đ\p{L},\s]+(?:và|,) [đ\p{L}]+ khoản này/iu,
@@ -481,6 +624,9 @@
             }, 1000); // 1 second delay
         }
     }
+
+    // Call createNewDocument() to initialize the first document
+    // createNewDocument();
   </script>
 </body>
 </html>
