@@ -103,9 +103,6 @@
   
   <button id="newDocumentButton" class="parse-button ready" onclick="openNewDocumentPopup()">Create New Document</button>
 
-  <h3>Document Content</h3>
-  <textarea id="documentContent" placeholder="Enter document content here..."></textarea>
-
   <button id="parseButton" class="parse-button empty" disabled onclick="parseDocument()">Parse Document</button>
   <button id="extractButton" class="parse-button empty" disabled onclick="extractRelatedLevel()">Extract Related Level</button>
 
@@ -177,6 +174,9 @@
     let documentInfo = [];
     let currentDocumentID = 1;
 
+    // Initialize the ID counter outside of the parseDocument function
+    let idCounter = 0; // Move this outside to maintain state across documents
+
     // Add a new function to create a new document entry
     function createNewDocument() {
         const newDocument = {
@@ -192,6 +192,7 @@
         documentInfo.push(newDocument);
         updateDocumentInfoDisplay(); // Update the display of documents
         closeNewDocumentPopup(); // Close the popup
+        updateParseButtonState(); // Update Parse Document button state
     }
 
     // Function to update the display of all documents
@@ -244,6 +245,7 @@
         document.getElementById('newDocumentType').value = 'Luật'; // Reset to default
         document.getElementById('newEffectiveDate').value = '';
         document.getElementById('newDocumentToReplace').value = '';
+        document.getElementById('newDocumentContent').value = ''; // Reset Document Content
         updateCreateButtonState(); // Update button state
     }
 
@@ -255,8 +257,9 @@
         const type = document.getElementById('newDocumentType').value;
         const effectiveDate = document.getElementById('newEffectiveDate').value.trim();
         const toReplace = document.getElementById('newDocumentToReplace').value.trim();
+        const content = document.getElementById('newDocumentContent').value.trim(); // Validate content
 
-        if (name && code && type && effectiveDate && toReplace) {
+        if (name && code && type && effectiveDate && toReplace && content) {
             createButton.disabled = false;
             createButton.textContent = 'Create';
             createButton.className = 'parse-button ready';
@@ -273,33 +276,13 @@
     document.getElementById('newDocumentType').addEventListener('change', updateCreateButtonState);
     document.getElementById('newEffectiveDate').addEventListener('input', updateCreateButtonState);
     document.getElementById('newDocumentToReplace').addEventListener('input', updateCreateButtonState);
+    document.getElementById('newDocumentContent').addEventListener('input', updateCreateButtonState); // Add listener for Document Content
 
     // Function to close the new document popup
     function closeNewDocumentPopup() {
         document.getElementById('overlay').style.display = 'none';
         document.getElementById('newDocumentPopup').style.display = 'none';
     }
-
-    // Add input listener to check content
-    inputArea.addEventListener('input', function() {
-        if (this.value.trim() === '') {
-            parseButton.disabled = true;
-            parseButton.textContent = 'Fill the input';
-            parseButton.className = 'parse-button empty';
-            
-            extractButton.disabled = true;
-            extractButton.textContent = 'Fill the input';
-            extractButton.className = 'parse-button empty';
-        } else {
-            parseButton.disabled = false;
-            parseButton.textContent = 'Parse Document';
-            parseButton.className = 'parse-button ready';
-            
-            extractButton.disabled = true;
-            extractButton.textContent = 'Parse document first';
-            extractButton.className = 'parse-button empty';
-        }
-    });
 
     // Add these before the parseDocument function
     const levelPatterns = [
@@ -343,18 +326,26 @@
         return levelHierarchy.indexOf(childName) > levelHierarchy.indexOf(parentName);
     }
 
-    // Modify the parseDocument function to include document information
-    async function parseDocument() {
-        const selectedIndex = document.getElementById('documentSelect').value;
-        const currentDocument = documentInfo[selectedIndex];
+    // Function to update the Parse Document button state
+    function updateParseButtonState() {
+        if (documentInfo.length > 0) {
+            parseButton.disabled = false;
+            parseButton.textContent = 'Parse Document';
+            parseButton.className = 'parse-button ready';
+        } else {
+            parseButton.disabled = true;
+            parseButton.textContent = 'No documents available';
+            parseButton.className = 'parse-button empty';
+        }
+    }
 
-        // Retrieve document information from input fields
-        currentDocument.name = document.getElementById('documentName').value;
-        currentDocument.code = document.getElementById('documentCode').value;
-        currentDocument.type = document.getElementById('documentType').value;
-        currentDocument.effectiveDate = document.getElementById('effectiveDate').value;
-        currentDocument.toReplace = document.getElementById('documentToReplace').value;
-        currentDocument.id = document.getElementById('documentID').value; // Get the Document ID value
+    // Modify the parseDocument function to enable the Extract Related Level button if rows are present
+    async function parseDocument() {
+        // Check if there are documents to parse
+        if (documentInfo.length === 0) {
+            alert('No documents available to parse.');
+            return;
+        }
 
         // Set parsing state
         parseButton.disabled = true;
@@ -366,120 +357,122 @@
             const tableBody = document.querySelector('#resultTable tbody');
             tableBody.innerHTML = '';
 
-            const rawText = document.getElementById('documentContent').value;
-            const lines = rawText.split(/\n/);
-            const levels = [];
-            let idCounter = 0;
-            let parentStack = [];
-            let currentDetail = '';
-            let emptyLineCount = 0;
+            // Iterate through each document in documentInfo
+            for (const currentDocument of documentInfo) {
+                const rawText = currentDocument.content; // Use the content from the document
+                const lines = rawText.split(/\n/);
+                const levels = [];
+                let parentStack = [];
+                let currentDetail = '';
+                let emptyLineCount = 0;
 
-            lines.forEach((line, index) => {
-                const trimmed = line.trim();
-                
-                if (!trimmed) {
-                    emptyLineCount++;
-                    if (currentDetail && emptyLineCount === 1) {
-                        currentDetail = currentDetail.trimEnd() + '\\n\\n';
-                    }
-                    return;
-                }
-                emptyLineCount = 0;
-
-                const levelMatch = findLevel(trimmed);
-                if (levelMatch) {
-                    const id = ++idCounter;
+                lines.forEach((line, index) => {
+                    const trimmed = line.trim();
                     
-                    if (currentDetail) {
-                        levels[levels.length - 1].detail = currentDetail.trimEnd();
-                        currentDetail = '';
-                    }
-
-                    while (
-                        parentStack.length > 0 &&
-                        !isChildLevel(parentStack[parentStack.length - 1].name, levelMatch.name)
-                    ) {
-                        parentStack.pop();
-                    }
-                    const parentId = parentStack.length > 0 ? parentStack[parentStack.length - 1].id : null;
-
-                    // Initialize title with the level title
-                    let title = levelMatch.title || '';
-
-                    // Check if the title is on the same line
-                    if (title) {
-                        // Title is already set from levelMatch
-                    } else if (index + 1 < lines.length) {
-                        // Check the next line
-                        const nextLine = lines[index + 1].trim();
-                        const nextLevelMatch = findLevel(nextLine);
-                        if (!nextLevelMatch) {
-                            // If the next line is not a new level, take it as the title
-                            title = nextLine;
+                    if (!trimmed) {
+                        emptyLineCount++;
+                        if (currentDetail && emptyLineCount === 1) {
+                            currentDetail = currentDetail.trimEnd() + '\\n\\n';
                         }
+                        return;
                     }
+                    emptyLineCount = 0;
 
-                    levels.push({ 
-                        id, 
-                        name: levelMatch.fullMatch,
-                        title: title, // Use the determined title
-                        detail: '',
-                        parentId,
-                        levelName: levelMatch.name
-                    });
-
-                    parentStack.push({ id, name: levelMatch.name });
-                } else {
-                    const lastLevel = levels[levels.length - 1];
-                    if (lastLevel && trimmed !== lastLevel.title) {
+                    const levelMatch = findLevel(trimmed);
+                    if (levelMatch) {
+                        const id = ++idCounter; // Increment the ID counter for each level
+                        
                         if (currentDetail) {
-                            if (currentDetail.endsWith('\\n\\n')) {
-                                currentDetail += trimmed;
-                            } else {
-                                currentDetail = currentDetail.trimEnd() + '\\n' + trimmed;
+                            levels[levels.length - 1].detail = currentDetail.trimEnd();
+                            currentDetail = '';
+                        }
+
+                        while (
+                            parentStack.length > 0 &&
+                            !isChildLevel(parentStack[parentStack.length - 1].name, levelMatch.name)
+                        ) {
+                            parentStack.pop();
+                        }
+                        const parentId = parentStack.length > 0 ? parentStack[parentStack.length - 1].id : null;
+
+                        // Initialize title with the level title
+                        let title = levelMatch.title || '';
+
+                        // Check if the title is on the same line
+                        if (title) {
+                            // Title is already set from levelMatch
+                        } else if (index + 1 < lines.length) {
+                            // Check the next line
+                            const nextLine = lines[index + 1].trim();
+                            const nextLevelMatch = findLevel(nextLine);
+                            if (!nextLevelMatch) {
+                                // If the next line is not a new level, take it as the title
+                                title = nextLine;
                             }
-                        } else {
-                            currentDetail = trimmed;
+                        }
+
+                        levels.push({ 
+                            id, 
+                            name: levelMatch.fullMatch,
+                            title: title, // Use the determined title
+                            detail: '',
+                            parentId,
+                            levelName: levelMatch.name
+                        });
+
+                        parentStack.push({ id, name: levelMatch.name });
+                    } else {
+                        const lastLevel = levels[levels.length - 1];
+                        if (lastLevel && trimmed !== lastLevel.title) {
+                            if (currentDetail) {
+                                if (currentDetail.endsWith('\\n\\n')) {
+                                    currentDetail += trimmed;
+                                } else {
+                                    currentDetail = currentDetail.trimEnd() + '\\n' + trimmed;
+                                }
+                            } else {
+                                currentDetail = trimmed;
+                            }
                         }
                     }
-                }
-            });
+                });
 
-            // Handle any remaining detail
-            if (currentDetail && levels.length > 0) {
-                levels[levels.length - 1].detail = currentDetail.trimEnd();
+                // Handle any remaining detail
+                if (currentDetail && levels.length > 0) {
+                    levels[levels.length - 1].detail = currentDetail.trimEnd();
+                }
+
+                // Store parsed structure in documentInfo
+                currentDocument.parsedStructure = levels;
+
+                // Populate the table
+                levels.forEach(level => {
+                    const row = document.createElement('tr');
+                    
+                    // Create and populate cells
+                    [
+                        level.id, 
+                        level.levelName,
+                        level.name, 
+                        level.title, 
+                        level.detail, 
+                        level.parentId || '',
+                        '' , // Empty cell for Extracted Related Text
+                        currentDocument.id // Use the auto-generated Document ID for the new column
+                    ].forEach(text => {
+                        const cell = document.createElement('td');
+                        cell.textContent = text;
+                        row.appendChild(cell);
+                    });
+                    
+                    tableBody.appendChild(row);
+                });
             }
 
-            // Store parsed structure in documentInfo
-            currentDocument.parsedStructure = levels;
-
-            // Populate the table
-            levels.forEach(level => {
-                const row = document.createElement('tr');
-                
-                // Create and populate cells
-                [
-                    level.id, 
-                    level.levelName,
-                    level.name, 
-                    level.title, 
-                    level.detail, 
-                    level.parentId || '',
-                    '' , // Empty cell for Extracted Related Text
-                    currentDocument.id // Use the auto-generated Document ID for the new column
-                ].forEach(text => {
-                    const cell = document.createElement('td');
-                    cell.textContent = text;
-                    row.appendChild(cell);
-                });
-                
-                tableBody.appendChild(row);
-            });
-
-            // After successful parsing, enable the extract button
-            extractButton.disabled = false;
-            extractButton.textContent = 'Extract Related Level';
-            extractButton.className = 'parse-button ready';
+            // Enable the Extract Related Level button if there are rows in the table
+            extractButton.disabled = tableBody.rows.length === 0;
+            extractButton.textContent = extractButton.disabled ? 'No data to extract' : 'Extract Related Level';
+            extractButton.className = extractButton.disabled ? 'parse-button empty' : 'parse-button ready';
         } finally {
             // Delay before resetting button state
             setTimeout(() => {
@@ -527,7 +520,7 @@
                 // /((điểm(\s+([\p{L}]|(\d+\.){2,}(?:\d+))\b(,(\s+điểm)*|\s+và(\s+điểm)*)*)+\s*)*(khoản(\s+((\d+(?:\.\d+)?)|này)\b(;|,(\s+khoản)*|\s+và(\s+khoản)*)*)+\s*))/iu,
                 
                 // // Complex mixed references with điểm, khoản and Điều
-                // /điểm [đ\p{L}] và điểm [đ\p{L}] khoản \d+(?:,\s*khoản \d+)*(?:,\s*điểm [đ\p{L}] khoản \d+)? (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
+                // /điểm [đ\p{L}] và điểm [đ\p{L}] khoản \d+(?:,\s*khoản \d+)*(?:,\s*đi���m [đ\p{L}] khoản \d+)? (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
                 
                 // // Multiple điểm with commas and "và" with khoản and Điều
                 // /(?:tại )?(?:các )?điểm [đ\p{L},\s]+(?:và|,) [đ\p{L}]+ khoản \d+ (?:Điều \d+|Điều này)(?: của Luật này)?/iu,
