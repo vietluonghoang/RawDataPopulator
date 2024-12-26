@@ -378,8 +378,8 @@
         { name: 'Phụ lục', regex: /^(Phụ lục [^\n]+?)\s*(.*)/iu },
         { name: 'Chương', regex: /^(Chương\s+(?:[IVX]+|\d+))\s*(.*)/iu },
         { name: 'Mục', regex: /^(Mục [^\n]+?)\s*(.*)/iu },
-        { name: 'Điều', regex: /^(Điều [^\n]+?\.)\s*(.*)/iu },
-        { name: 'Khoản', regex: /^(\d+[\p{L}]*\.(?:\d+\.)?)\s+(.*)/iu },
+        { name: 'Điều', regex: /^(Điều [^\n]+?\.|[^\n]\.\d+[^\n]?|[^\n]\d+\.)\s+(.*)/iu },
+        { name: 'Khoản', regex: /^(\d+[\p{L}]*\.(?:\d+\.)?|[\p{L}]\d+\.(?:\d+\.)(?:\d+\.)?|[\p{L}]\.\d+\.(?:\d+)?)\s+(.*)/iu },
         { name: 'Điểm', regex: /^([\p{L}]\.|[\p{L}]\)|\d+\.(?:\d+\.){2,})\s+(.*)/iu }
     ];
 
